@@ -1,0 +1,1500 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title="Choplifter - Classic 1982 Game" description="Mobile version of the classic Apple II Plus game Choplifter from 1982" />
+		<style>
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+				touch-action: none;
+				-webkit-touch-callout: none;
+				-webkit-user-select: none;
+				user-select: none;
+			}
+
+			html, body {
+				width: 100%;
+				height: 100%;
+				overflow: hidden;
+				background: #000;
+				font-family: 'Courier New', monospace;
+			}
+
+			#game-container {
+				width: 100%;
+				height: 100%;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				position: relative;
+			}
+
+			#gameCanvas {
+				background: #000;
+				image-rendering: pixelated;
+				image-rendering: crisp-edges;
+			}
+
+			#controls {
+				position: fixed;
+				bottom: 0;
+				left: 0;
+				right: 0;
+				height: 160px;
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				padding: 10px 20px;
+				background: rgba(0, 0, 0, 0.8);
+				z-index: 100;
+			}
+
+			#joystick-zone {
+				width: 140px;
+				height: 140px;
+				position: relative;
+			}
+
+			#joystick-base {
+				width: 120px;
+				height: 120px;
+				background: rgba(0, 255, 0, 0.2);
+				border: 3px solid #0f0;
+				border-radius: 50%;
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+			}
+
+			#joystick-stick {
+				width: 50px;
+				height: 50px;
+				background: rgba(0, 255, 0, 0.6);
+				border: 2px solid #0f0;
+				border-radius: 50%;
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				transition: none;
+			}
+
+			#action-buttons {
+				display: flex;
+				gap: 15px;
+			}
+
+			.action-btn {
+				width: 70px;
+				height: 70px;
+				border-radius: 50%;
+				border: 3px solid #0f0;
+				background: rgba(0, 255, 0, 0.2);
+				color: #0f0;
+				font-size: 12px;
+				font-weight: bold;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				cursor: pointer;
+			}
+
+			.action-btn:active {
+				background: rgba(0, 255, 0, 0.5);
+			}
+
+			#hud {
+				position: fixed;
+				top: 0;
+				left: 0;
+				right: 0;
+				padding: 10px 15px;
+				display: flex;
+				justify-content: space-between;
+				color: #0f0;
+				font-size: 14px;
+				background: rgba(0, 0, 0, 0.8);
+				z-index: 100;
+			}
+
+			#start-screen, #game-over-screen {
+				position: fixed;
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				background: rgba(0, 0, 0, 0.95);
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				color: #0f0;
+				z-index: 200;
+				text-align: center;
+				padding: 20px;
+			}
+
+			#start-screen h1, #game-over-screen h1 {
+				font-size: 32px;
+				margin-bottom: 20px;
+				text-shadow: 0 0 10px #0f0;
+			}
+
+			#start-screen p, #game-over-screen p {
+				margin: 10px 0;
+				font-size: 14px;
+				max-width: 300px;
+			}
+
+			.start-btn {
+				margin-top: 30px;
+				padding: 15px 40px;
+				font-size: 20px;
+				background: transparent;
+				border: 3px solid #0f0;
+				color: #0f0;
+				cursor: pointer;
+				font-family: 'Courier New', monospace;
+			}
+
+			.start-btn:active {
+				background: rgba(0, 255, 0, 0.3);
+			}
+
+			.hidden {
+				display: none !important;
+			}
+
+			#instructions {
+				margin-top: 20px;
+				font-size: 12px;
+				opacity: 0.8;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="game-container">
+			<div id="hud">
+				<span>SCORE: <span id="score">0</span></span>
+				<span>RESCUED: <span id="rescued">0</span>/64</span>
+				<span>ONBOARD: <span id="onboard">0</span>/16</span>
+				<span>LIVES: <span id="lives">3</span></span>
+			</div>
+
+			<canvas id="gameCanvas"></canvas>
+
+			<div id="controls">
+				<div id="joystick-zone">
+					<div id="joystick-base">
+						<div id="joystick-stick"></div>
+					</div>
+				</div>
+				<div id="action-buttons">
+					<button class="action-btn" id="btn-turn">TURN</button>
+					<button class="action-btn" id="btn-fire">FIRE</button>
+				</div>
+			</div>
+
+			<div id="start-screen">
+				<h1>CHOPLIFTER</h1>
+				<p>Apple II Plus Classic (1982)</p>
+				<p>Pilot your helicopter behind enemy lines to rescue hostages. Land near buildings to pick up hostages, then return them to your base.</p>
+				<div id="instructions">
+					<p>🕹️ JOYSTICK: Move helicopter</p>
+					<p>TURN: Rotate helicopter direction</p>
+					<p>FIRE: Shoot enemies</p>
+				</div>
+				<button class="start-btn" id="start-btn">START GAME</button>
+			</div>
+
+			<div id="game-over-screen" class="hidden">
+				<h1>GAME OVER</h1>
+				<p>Final Score: <span id="final-score">0</span></p>
+				<p>Hostages Rescued: <span id="final-rescued">0</span></p>
+				<button class="start-btn" id="restart-btn">PLAY AGAIN</button>
+			</div>
+		</div>
+
+		<script>
+			// ============================================
+			// CHOPLIFTER - Mobile HTML5 Canvas Game
+			// Based on the 1982 Apple II Plus classic
+			// ============================================
+
+			const canvas = document.getElementById('gameCanvas');
+			const ctx = canvas.getContext('2d');
+
+			// Game constants
+			const GROUND_HEIGHT = 60;
+			const GRAVITY = 0.15;
+			const MAX_HOSTAGES_ONBOARD = 16;
+			const TOTAL_HOSTAGES = 64;
+
+			// Colors (Apple II Plus green phosphor style)
+			const COLORS = {
+				bg: '#000000',
+				primary: '#33ff33',
+				secondary: '#00aa00',
+				dark: '#006600',
+				ground: '#004400',
+				building: '#008800',
+				hostage: '#ffff00',
+				enemy: '#ff3333',
+				explosion: '#ff6600'
+			};
+
+			// Game state
+			let gameState = 'start'; // start, playing, gameover
+			let score = 0;
+			let lives = 3;
+			let rescuedTotal = 0;
+			let worldOffset = 0;
+
+			// Input state
+			let joystickX = 0;
+			let joystickY = 0;
+			let isFiring = false;
+			let turnPressed = false;
+
+			// Game objects
+			let helicopter = null;
+			let hostages = [];
+			let enemies = [];
+			let bullets = [];
+			let explosions = [];
+			let buildings = [];
+			let base = null;
+
+			// Screen sizing
+			function resizeCanvas() {
+				const container = document.getElementById('game-container');
+				const controlsHeight = 160;
+				const hudHeight = 40;
+				const availableHeight = window.innerHeight - controlsHeight - hudHeight;
+				const availableWidth = window.innerWidth;
+
+				// Maintain 16:9 aspect ratio
+				const aspectRatio = 16 / 9;
+				let width = availableWidth;
+				let height = width / aspectRatio;
+
+				if (height > availableHeight) {
+					height = availableHeight;
+					width = height * aspectRatio;
+				}
+
+				canvas.width = Math.floor(width);
+				canvas.height = Math.floor(height);
+				canvas.style.width = width + 'px';
+				canvas.style.height = height + 'px';
+			}
+
+			// Helicopter class
+			class Helicopter {
+				constructor(x, y) {
+					this.x = x;
+					this.y = y;
+					this.vx = 0;
+					this.vy = 0;
+					this.direction = 0; // -1 left, 0 forward, 1 right
+					this.rotorAngle = 0;
+					this.hostagess = 0;
+					this.width = 60;
+					this.height = 30;
+					this.isLanded = false;
+					this.invincible = 0;
+				}
+
+				update(dt) {
+					// Apply joystick input
+					const accelX = 0.3;
+					const accelY = 0.4;
+					const maxSpeedX = 5;
+					const maxSpeedY = 4;
+
+					// Horizontal movement
+					this.vx += joystickX * accelX;
+					this.vx *= 0.95; // Drag
+					this.vx = Math.max(-maxSpeedX, Math.min(maxSpeedX, this.vx));
+
+					// Vertical movement
+					if (joystickY < -0.3) {
+						this.vy -= accelY;
+					} else if (joystickY > 0.3) {
+						this.vy += accelY * 0.5;
+					}
+					this.vy += GRAVITY; // Gravity
+					this.vy *= 0.95; // Drag
+					this.vy = Math.max(-maxSpeedY, Math.min(maxSpeedY, this.vy));
+
+					// Update position
+					this.x += this.vx;
+					this.y += this.vy;
+
+					// Ground collision
+					const groundY = canvas.height - GROUND_HEIGHT - this.height / 2;
+					if (this.y >= groundY) {
+						this.y = groundY;
+						this.vy = 0;
+						this.isLanded = Math.abs(this.vx) < 0.5;
+					} else {
+						this.isLanded = false;
+					}
+
+					// Ceiling
+					if (this.y < this.height / 2) {
+						this.y = this.height / 2;
+						this.vy = 0;
+					}
+
+					// Update world offset to follow helicopter
+					const screenX = this.x - worldOffset;
+					const margin = canvas.width * 0.3;
+
+					if (screenX > canvas.width - margin) {
+						worldOffset = this.x - (canvas.width - margin);
+					} else if (screenX < margin) {
+						worldOffset = this.x - margin;
+					}
+
+					// Clamp world offset
+					worldOffset = Math.max(0, Math.min(worldOffset, 3000 - canvas.width));
+
+					// Rotor animation
+					this.rotorAngle += 0.5;
+
+					// Invincibility countdown
+					if (this.invincible > 0) this.invincible--;
+				}
+
+				draw() {
+					const screenX = this.x - worldOffset;
+					const screenY = this.y;
+
+					// Flash when invincible
+					if (this.invincible > 0 && Math.floor(this.invincible / 5) % 2 === 0) {
+						return;
+					}
+
+					ctx.save();
+					ctx.translate(screenX, screenY);
+
+					// Draw based on direction
+					ctx.strokeStyle = COLORS.primary;
+					ctx.fillStyle = COLORS.secondary;
+					ctx.lineWidth = 2;
+
+					if (this.direction === 0) {
+						// Facing forward (toward screen)
+						// Body
+						ctx.beginPath();
+						ctx.ellipse(0, 0, 20, 15, 0, 0, Math.PI * 2);
+						ctx.stroke();
+
+						// Cockpit
+						ctx.beginPath();
+						ctx.ellipse(0, -2, 10, 8, 0, 0, Math.PI * 2);
+						ctx.stroke();
+
+						// Skids
+						ctx.beginPath();
+						ctx.moveTo(-15, 15);
+						ctx.lineTo(-15, 20);
+						ctx.lineTo(15, 20);
+						ctx.lineTo(15, 15);
+						ctx.stroke();
+
+						// Rotor (spinning)
+						ctx.beginPath();
+						const rotorLen = 30 * Math.abs(Math.cos(this.rotorAngle));
+						ctx.moveTo(-rotorLen, -15);
+						ctx.lineTo(rotorLen, -15);
+						ctx.stroke();
+					} else {
+						// Facing left or right
+						const dir = this.direction;
+
+						// Body
+						ctx.beginPath();
+						ctx.ellipse(0, 0, 25, 12, 0, 0, Math.PI * 2);
+						ctx.stroke();
+
+						// Cockpit
+						ctx.beginPath();
+						ctx.ellipse(dir * 10, -2, 12, 10, 0, 0, Math.PI * 2);
+						ctx.stroke();
+
+						// Tail
+						ctx.beginPath();
+						ctx.moveTo(-dir * 25, 0);
+						ctx.lineTo(-dir * 40, -5);
+						ctx.lineTo(-dir * 40, 5);
+						ctx.closePath();
+						ctx.stroke();
+
+						// Tail rotor
+						ctx.beginPath();
+						ctx.moveTo(-dir * 40, -10);
+						ctx.lineTo(-dir * 40, 10);
+						ctx.stroke();
+
+						// Skids
+						ctx.beginPath();
+						ctx.moveTo(-20, 12);
+						ctx.lineTo(-20, 18);
+						ctx.lineTo(15, 18);
+						ctx.lineTo(15, 12);
+						ctx.stroke();
+
+						// Main rotor
+						ctx.beginPath();
+						const rotorX = Math.cos(this.rotorAngle) * 35;
+						ctx.moveTo(-rotorX, -12);
+						ctx.lineTo(rotorX, -12);
+						ctx.lineWidth = 3;
+						ctx.stroke();
+					}
+
+					ctx.restore();
+				}
+
+				turn() {
+					this.direction++;
+					if (this.direction > 1) this.direction = -1;
+				}
+
+				fire() {
+					if (this.direction !== 0) {
+						bullets.push(new Bullet(
+							this.x + this.direction * 30,
+							this.y,
+							this.direction * 10,
+							0
+						));
+					}
+				}
+
+				hit() {
+					if (this.invincible > 0) return false;
+
+					// Drop all hostages (they die)
+					this.hostagess = 0;
+
+					lives--;
+					if (lives <= 0) {
+						gameState = 'gameover';
+						showGameOver();
+					} else {
+						// Respawn at base
+						this.x = base.x;
+						this.y = canvas.height - GROUND_HEIGHT - 100;
+						this.vx = 0;
+						this.vy = 0;
+						this.invincible = 120; // 2 seconds
+					}
+
+					explosions.push(new Explosion(this.x, this.y));
+					return true;
+				}
+
+				getBounds() {
+					return {
+						x: this.x - this.width / 2,
+						y: this.y - this.height / 2,
+						width: this.width,
+						height: this.height
+					};
+				}
+			}
+
+			// Hostage class
+			class Hostage {
+				constructor(x, y, buildingIndex) {
+					this.x = x;
+					this.y = y;
+					this.homeX = x;
+					this.buildingIndex = buildingIndex;
+					this.state = 'waiting'; // waiting, freed, running, boarding, rescued, dead
+					this.vx = 0;
+					this.animFrame = 0;
+				}
+
+				update() {
+					if (this.state === 'dead' || this.state === 'rescued' || this.state === 'boarding') return;
+
+					this.animFrame += 0.2;
+
+					const heliScreenX = helicopter.x;
+					const distToHeli = heliScreenX - this.x;
+					const distY = Math.abs((canvas.height - GROUND_HEIGHT - 10) - helicopter.y);
+
+					if (this.state === 'waiting') {
+						// Check if building is destroyed
+						const building = buildings[this.buildingIndex];
+						if (building && building.destroyed) {
+							this.state = 'freed';
+						}
+					}
+
+					if (this.state === 'freed') {
+						// Check if helicopter is nearby and landed
+						if (Math.abs(distToHeli) < 150 && helicopter.isLanded && distY < 50) {
+							this.state = 'running';
+						} else {
+							// Wander around
+							if (Math.random() < 0.02) {
+								this.vx = (Math.random() - 0.5) * 1;
+							}
+							this.x += this.vx;
+							// Stay near home
+							if (Math.abs(this.x - this.homeX) > 100) {
+								this.vx = (this.homeX - this.x) * 0.01;
+							}
+						}
+					}
+
+					if (this.state === 'running') {
+						// Run toward helicopter
+						const speed = 2;
+						if (distToHeli > 5) {
+							this.vx = speed;
+						} else if (distToHeli < -5) {
+							this.vx = -speed;
+						} else {
+							// Reached helicopter - board it
+							if (helicopter.hostagess < MAX_HOSTAGES_ONBOARD) {
+								helicopter.hostagess++;
+								this.state = 'boarding';
+								updateHUD();
+							}
+						}
+						this.x += this.vx;
+
+						// If helicopter takes off, stop running
+						if (!helicopter.isLanded || distY > 50) {
+							this.state = 'freed';
+							this.vx = 0;
+						}
+					}
+				}
+
+				draw() {
+					if (this.state === 'dead' || this.state === 'boarding' || this.state === 'rescued') return;
+					if (this.state === 'waiting') return; // Still in building
+
+					const screenX = this.x - worldOffset;
+					const screenY = canvas.height - GROUND_HEIGHT - 10;
+
+					// Simple stick figure
+					ctx.strokeStyle = COLORS.hostage;
+					ctx.lineWidth = 2;
+
+					// Body
+					ctx.beginPath();
+					ctx.moveTo(screenX, screenY - 15);
+					ctx.lineTo(screenX, screenY - 5);
+					ctx.stroke();
+
+					// Head
+					ctx.beginPath();
+					ctx.arc(screenX, screenY - 18, 3, 0, Math.PI * 2);
+					ctx.stroke();
+
+					// Arms (waving)
+					const armWave = Math.sin(this.animFrame) * 5;
+					ctx.beginPath();
+					ctx.moveTo(screenX - 5, screenY - 12 + armWave);
+					ctx.lineTo(screenX, screenY - 10);
+					ctx.lineTo(screenX + 5, screenY - 12 - armWave);
+					ctx.stroke();
+
+					// Legs (running animation)
+					const legOffset = this.state === 'running' ? Math.sin(this.animFrame * 2) * 4 : 0;
+					ctx.beginPath();
+					ctx.moveTo(screenX - 3 - legOffset, screenY);
+					ctx.lineTo(screenX, screenY - 5);
+					ctx.lineTo(screenX + 3 + legOffset, screenY);
+					ctx.stroke();
+				}
+
+				kill() {
+					if (this.state !== 'dead' && this.state !== 'rescued' && this.state !== 'boarding') {
+						this.state = 'dead';
+						explosions.push(new Explosion(this.x, canvas.height - GROUND_HEIGHT - 10, 'small'));
+					}
+				}
+			}
+
+			// Building class (hostage barracks)
+			class Building {
+				constructor(x, hostageCount) {
+					this.x = x;
+					this.width = 80;
+					this.height = 60;
+					this.destroyed = false;
+					this.hostageCount = hostageCount;
+					this.health = 3;
+				}
+
+				draw() {
+					const screenX = this.x - worldOffset;
+					const groundY = canvas.height - GROUND_HEIGHT;
+
+					if (this.destroyed) {
+						// Draw rubble
+						ctx.fillStyle = COLORS.dark;
+						for (let i = 0; i < 5; i++) {
+							ctx.fillRect(
+								screenX - 30 + i * 15,
+								groundY - 10 - Math.random() * 5,
+								10,
+								10
+							);
+						}
+					} else {
+						// Draw building
+						ctx.strokeStyle = COLORS.building;
+						ctx.fillStyle = COLORS.dark;
+						ctx.lineWidth = 2;
+
+						// Main structure
+						ctx.fillRect(screenX - this.width/2, groundY - this.height, this.width, this.height);
+						ctx.strokeRect(screenX - this.width/2, groundY - this.height, this.width, this.height);
+
+						// Door
+						ctx.fillStyle = COLORS.bg;
+						ctx.fillRect(screenX - 10, groundY - 25, 20, 25);
+						ctx.strokeRect(screenX - 10, groundY - 25, 20, 25);
+
+						// Windows
+						ctx.fillRect(screenX - 30, groundY - 50, 15, 15);
+						ctx.fillRect(screenX + 15, groundY - 50, 15, 15);
+						ctx.strokeRect(screenX - 30, groundY - 50, 15, 15);
+						ctx.strokeRect(screenX + 15, groundY - 50, 15, 15);
+					}
+				}
+
+				hit() {
+					if (this.destroyed) return;
+					this.health--;
+					if (this.health <= 0) {
+						this.destroyed = true;
+						explosions.push(new Explosion(this.x, canvas.height - GROUND_HEIGHT - 30));
+						score += 50;
+						updateHUD();
+					}
+				}
+
+				getBounds() {
+					return {
+						x: this.x - this.width/2,
+						y: canvas.height - GROUND_HEIGHT - this.height,
+						width: this.width,
+						height: this.height
+					};
+				}
+			}
+
+			// Base class (home base)
+			class Base {
+				constructor(x) {
+					this.x = x;
+					this.width = 120;
+					this.height = 40;
+				}
+
+				draw() {
+					const screenX = this.x - worldOffset;
+					const groundY = canvas.height - GROUND_HEIGHT;
+
+					ctx.strokeStyle = COLORS.primary;
+					ctx.fillStyle = COLORS.dark;
+					ctx.lineWidth = 2;
+
+					// Hangar
+					ctx.beginPath();
+					ctx.moveTo(screenX - this.width/2, groundY);
+					ctx.lineTo(screenX - this.width/2, groundY - this.height);
+					ctx.lineTo(screenX, groundY - this.height - 20);
+					ctx.lineTo(screenX + this.width/2, groundY - this.height);
+					ctx.lineTo(screenX + this.width/2, groundY);
+					ctx.closePath();
+					ctx.fill();
+					ctx.stroke();
+
+					// Landing pad markings
+					ctx.strokeStyle = COLORS.secondary;
+					ctx.setLineDash([10, 5]);
+					ctx.beginPath();
+					ctx.moveTo(screenX - 50, groundY - 2);
+					ctx.lineTo(screenX + 50, groundY - 2);
+					ctx.stroke();
+					ctx.setLineDash([]);
+
+					// Flag
+					ctx.strokeStyle = COLORS.primary;
+					ctx.beginPath();
+					ctx.moveTo(screenX + this.width/2 + 10, groundY);
+					ctx.lineTo(screenX + this.width/2 + 10, groundY - 50);
+					ctx.stroke();
+
+					ctx.fillStyle = COLORS.primary;
+					ctx.beginPath();
+					ctx.moveTo(screenX + this.width/2 + 10, groundY - 50);
+					ctx.lineTo(screenX + this.width/2 + 30, groundY - 40);
+					ctx.lineTo(screenX + this.width/2 + 10, groundY - 30);
+					ctx.fill();
+				}
+
+				checkLanding() {
+					if (!helicopter.isLanded) return;
+
+					const dist = Math.abs(helicopter.x - this.x);
+					if (dist < this.width / 2 + 20) {
+						// Unload hostages
+						if (helicopter.hostagess > 0) {
+							const rescued = helicopter.hostagess;
+							rescuedTotal += rescued;
+							score += rescued * 100;
+							helicopter.hostagess = 0;
+							updateHUD();
+
+							// Check win condition
+							if (rescuedTotal >= TOTAL_HOSTAGES) {
+								gameState = 'gameover';
+								showGameOver(true);
+							}
+						}
+					}
+				}
+			}
+
+			// Enemy Tank class
+			class Tank {
+				constructor(x) {
+					this.x = x;
+					this.y = canvas.height - GROUND_HEIGHT - 15;
+					this.width = 40;
+					this.height = 20;
+					this.direction = Math.random() < 0.5 ? -1 : 1;
+					this.fireTimer = Math.random() * 100 + 50;
+					this.health = 2;
+					this.speed = 0.5;
+				}
+
+				update() {
+					// Move
+					this.x += this.direction * this.speed;
+
+					// Change direction occasionally or at boundaries
+					if (Math.random() < 0.005 || this.x < 300 || this.x > 2800) {
+						this.direction *= -1;
+					}
+
+					// Fire at helicopter
+					this.fireTimer--;
+					if (this.fireTimer <= 0) {
+						const dist = helicopter.x - this.x;
+						if (Math.abs(dist) < 400) {
+							// Fire!
+							const angle = Math.atan2(helicopter.y - this.y, dist);
+							bullets.push(new Bullet(
+								this.x,
+								this.y - 10,
+								Math.cos(angle) * 5,
+								Math.sin(angle) * 5,
+								true
+							));
+						}
+						this.fireTimer = Math.random() * 150 + 100;
+					}
+				}
+
+				draw() {
+					const screenX = this.x - worldOffset;
+					const screenY = this.y;
+
+					ctx.strokeStyle = COLORS.enemy;
+					ctx.fillStyle = '#440000';
+					ctx.lineWidth = 2;
+
+					// Body
+					ctx.fillRect(screenX - 20, screenY - 10, 40, 15);
+					ctx.strokeRect(screenX - 20, screenY - 10, 40, 15);
+
+					// Turret
+					ctx.beginPath();
+					ctx.arc(screenX, screenY - 12, 10, 0, Math.PI * 2);
+					ctx.fill();
+					ctx.stroke();
+
+					// Barrel
+					ctx.beginPath();
+					ctx.moveTo(screenX, screenY - 12);
+					ctx.lineTo(screenX + this.direction * 20, screenY - 18);
+					ctx.lineWidth = 4;
+					ctx.stroke();
+					ctx.lineWidth = 2;
+
+					// Tracks
+					ctx.beginPath();
+					ctx.ellipse(screenX - 12, screenY + 2, 8, 5, 0, 0, Math.PI * 2);
+					ctx.stroke();
+					ctx.beginPath();
+					ctx.ellipse(screenX + 12, screenY + 2, 8, 5, 0, 0, Math.PI * 2);
+					ctx.stroke();
+				}
+
+				hit() {
+					this.health--;
+					if (this.health <= 0) {
+						explosions.push(new Explosion(this.x, this.y));
+						score += 200;
+						updateHUD();
+						return true;
+					}
+					return false;
+				}
+
+				getBounds() {
+					return {
+						x: this.x - this.width/2,
+						y: this.y - this.height/2,
+						width: this.width,
+						height: this.height
+					};
+				}
+			}
+
+			// Enemy Jet class
+			class Jet {
+				constructor() {
+					this.direction = Math.random() < 0.5 ? 1 : -1;
+					this.x = this.direction < 0 ? 3200 : -200;
+					this.y = Math.random() * 100 + 50;
+					this.speed = 6 + Math.random() * 2;
+					this.width = 50;
+					this.height = 20;
+					this.hasShot = false;
+				}
+
+				update() {
+					this.x += this.direction * this.speed;
+
+					// Fire at helicopter when passing nearby
+					if (!this.hasShot && Math.abs(this.x - helicopter.x) < 200) {
+						bullets.push(new Bullet(
+							this.x,
+							this.y + 10,
+							this.direction * 8,
+							2,
+							true
+						));
+						this.hasShot = true;
+					}
+
+					// Remove when off screen
+					if (this.x < -300 || this.x > 3500) {
+						return true; // Remove
+					}
+					return false;
+				}
+
+				draw() {
+					const screenX = this.x - worldOffset;
+					const screenY = this.y;
+
+					ctx.strokeStyle = COLORS.enemy;
+					ctx.fillStyle = '#440000';
+					ctx.lineWidth = 2;
+
+					ctx.save();
+					ctx.translate(screenX, screenY);
+					if (this.direction < 0) ctx.scale(-1, 1);
+
+					// Fuselage
+					ctx.beginPath();
+					ctx.moveTo(25, 0);
+					ctx.lineTo(-20, -5);
+					ctx.lineTo(-25, 0);
+					ctx.lineTo(-20, 5);
+					ctx.closePath();
+					ctx.fill();
+					ctx.stroke();
+
+					// Wings
+					ctx.beginPath();
+					ctx.moveTo(-5, -5);
+					ctx.lineTo(-15, -15);
+					ctx.lineTo(-20, -5);
+					ctx.closePath();
+					ctx.fill();
+					ctx.stroke();
+
+					ctx.beginPath();
+					ctx.moveTo(-5, 5);
+					ctx.lineTo(-15, 15);
+					ctx.lineTo(-20, 5);
+					ctx.closePath();
+					ctx.fill();
+					ctx.stroke();
+
+					// Tail
+					ctx.beginPath();
+					ctx.moveTo(-20, 0);
+					ctx.lineTo(-25, -8);
+					ctx.lineTo(-25, 8);
+					ctx.closePath();
+					ctx.stroke();
+
+					ctx.restore();
+				}
+
+				hit() {
+					explosions.push(new Explosion(this.x, this.y));
+					score += 300;
+					updateHUD();
+					return true;
+				}
+
+				getBounds() {
+					return {
+						x: this.x - this.width/2,
+						y: this.y - this.height/2,
+						width: this.width,
+						height: this.height
+					};
+				}
+			}
+
+			// Bullet class
+			class Bullet {
+				constructor(x, y, vx, vy, isEnemy = false) {
+					this.x = x;
+					this.y = y;
+					this.vx = vx;
+					this.vy = vy;
+					this.isEnemy = isEnemy;
+					this.life = 100;
+				}
+
+				update() {
+					this.x += this.vx;
+					this.y += this.vy;
+					this.life--;
+
+					// Ground hit
+					if (this.y > canvas.height - GROUND_HEIGHT) {
+						return true;
+					}
+
+					return this.life <= 0;
+				}
+
+				draw() {
+					const screenX = this.x - worldOffset;
+					const screenY = this.y;
+
+					ctx.fillStyle = this.isEnemy ? COLORS.enemy : COLORS.primary;
+					ctx.beginPath();
+					ctx.arc(screenX, screenY, 3, 0, Math.PI * 2);
+					ctx.fill();
+				}
+			}
+
+			// Explosion class
+			class Explosion {
+				constructor(x, y, size = 'normal') {
+					this.x = x;
+					this.y = y;
+					this.size = size;
+					this.frame = 0;
+					this.maxFrames = size === 'small' ? 15 : 30;
+				}
+
+				update() {
+					this.frame++;
+					return this.frame >= this.maxFrames;
+				}
+
+				draw() {
+					const screenX = this.x - worldOffset;
+					const screenY = this.y;
+					const progress = this.frame / this.maxFrames;
+					const baseRadius = this.size === 'small' ? 10 : 30;
+					const radius = baseRadius * (1 + progress);
+					const alpha = 1 - progress;
+
+					// Outer ring
+					ctx.strokeStyle = `rgba(255, 102, 0, ${alpha})`;
+					ctx.lineWidth = 3;
+					ctx.beginPath();
+					ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
+					ctx.stroke();
+
+					// Inner flash
+					ctx.fillStyle = `rgba(255, 255, 0, ${alpha * 0.5})`;
+					ctx.beginPath();
+					ctx.arc(screenX, screenY, radius * 0.5, 0, Math.PI * 2);
+					ctx.fill();
+				}
+			}
+
+			// Initialize game
+			function initGame() {
+				resizeCanvas();
+
+				// Reset state
+				score = 0;
+				lives = 3;
+				rescuedTotal = 0;
+				worldOffset = 0;
+
+				// Clear arrays
+				hostages = [];
+				enemies = [];
+				bullets = [];
+				explosions = [];
+				buildings = [];
+
+				// Create base (at the left side)
+				base = new Base(100);
+
+				// Create helicopter
+				helicopter = new Helicopter(100, canvas.height - GROUND_HEIGHT - 50);
+
+				// Create buildings with hostages (spread across the map)
+				const buildingPositions = [600, 1000, 1400, 1800, 2200, 2600];
+				const hostagesPerBuilding = Math.ceil(TOTAL_HOSTAGES / buildingPositions.length);
+
+				buildingPositions.forEach((pos, index) => {
+					buildings.push(new Building(pos, hostagesPerBuilding));
+
+					// Create hostages for this building
+					for (let i = 0; i < hostagesPerBuilding; i++) {
+						hostages.push(new Hostage(
+							pos + (Math.random() - 0.5) * 60,
+							canvas.height - GROUND_HEIGHT - 10,
+							index
+						));
+					}
+				});
+
+				// Create initial enemies
+				for (let i = 0; i < 5; i++) {
+					enemies.push(new Tank(500 + i * 400 + Math.random() * 200));
+				}
+
+				updateHUD();
+			}
+
+			// Update HUD
+			function updateHUD() {
+				document.getElementById('score').textContent = score;
+				document.getElementById('rescued').textContent = rescuedTotal;
+				document.getElementById('onboard').textContent = helicopter ? helicopter.hostagess : 0;
+				document.getElementById('lives').textContent = lives;
+			}
+
+			// Check collisions
+			function checkCollisions() {
+				// Check player bullets hitting enemies
+				bullets = bullets.filter(bullet => {
+					if (bullet.isEnemy) return true;
+
+					// Check tanks
+					for (let i = enemies.length - 1; i >= 0; i--) {
+						const enemy = enemies[i];
+						const bounds = enemy.getBounds();
+						if (bullet.x >= bounds.x && bullet.x <= bounds.x + bounds.width &&
+							bullet.y >= bounds.y && bullet.y <= bounds.y + bounds.height) {
+							if (enemy.hit()) {
+								enemies.splice(i, 1);
+							}
+							return false;
+						}
+					}
+
+					// Check buildings
+					for (const building of buildings) {
+						if (!building.destroyed) {
+							const bounds = building.getBounds();
+							if (bullet.x >= bounds.x && bullet.x <= bounds.x + bounds.width &&
+								bullet.y >= bounds.y && bullet.y <= bounds.y + bounds.height) {
+								building.hit();
+								return false;
+							}
+						}
+					}
+
+					return true;
+				});
+
+				// Check enemy bullets hitting helicopter
+				if (helicopter.invincible <= 0) {
+					const heliBounds = helicopter.getBounds();
+					bullets = bullets.filter(bullet => {
+						if (!bullet.isEnemy) return true;
+
+						if (bullet.x >= heliBounds.x && bullet.x <= heliBounds.x + heliBounds.width &&
+							bullet.y >= heliBounds.y && bullet.y <= heliBounds.y + heliBounds.height) {
+							helicopter.hit();
+							return false;
+						}
+						return true;
+					});
+				}
+
+				// Check helicopter collision with enemies
+				if (helicopter.invincible <= 0) {
+					const heliBounds = helicopter.getBounds();
+					for (const enemy of enemies) {
+						const bounds = enemy.getBounds();
+						if (heliBounds.x < bounds.x + bounds.width &&
+							heliBounds.x + heliBounds.width > bounds.x &&
+							heliBounds.y < bounds.y + bounds.height &&
+							heliBounds.y + heliBounds.height > bounds.y) {
+							helicopter.hit();
+							if (enemy.hit()) {
+								enemies.splice(enemies.indexOf(enemy), 1);
+							}
+							break;
+						}
+					}
+				}
+
+				// Check if helicopter crushes hostages when landing
+				if (helicopter.isLanded) {
+					const heliX = helicopter.x;
+					for (const hostage of hostages) {
+						if (hostage.state === 'freed' || hostage.state === 'running') {
+							if (Math.abs(hostage.x - heliX) < 15) {
+								hostage.kill();
+							}
+						}
+					}
+				}
+
+				// Check bullets hitting hostages
+				for (const bullet of bullets) {
+					for (const hostage of hostages) {
+						if (hostage.state === 'freed' || hostage.state === 'running') {
+							if (Math.abs(bullet.x - hostage.x) < 10 &&
+								Math.abs(bullet.y - (canvas.height - GROUND_HEIGHT - 10)) < 15) {
+								hostage.kill();
+							}
+						}
+					}
+				}
+			}
+
+			// Spawn enemies
+			let spawnTimer = 0;
+			function spawnEnemies() {
+				spawnTimer++;
+
+				// Spawn jets occasionally
+				if (spawnTimer % 300 === 0 && Math.random() < 0.5) {
+					enemies.push(new Jet());
+				}
+
+				// Spawn tanks occasionally
+				if (spawnTimer % 500 === 0 && enemies.filter(e => e instanceof Tank).length < 8) {
+					enemies.push(new Tank(500 + Math.random() * 2300));
+				}
+			}
+
+			// Draw background
+			function drawBackground() {
+				// Sky gradient
+				const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height - GROUND_HEIGHT);
+				gradient.addColorStop(0, '#001100');
+				gradient.addColorStop(1, '#002200');
+				ctx.fillStyle = gradient;
+				ctx.fillRect(0, 0, canvas.width, canvas.height - GROUND_HEIGHT);
+
+				// Stars
+				ctx.fillStyle = COLORS.secondary;
+				for (let i = 0; i < 50; i++) {
+					const x = (i * 73 + worldOffset * 0.1) % canvas.width;
+					const y = (i * 37) % (canvas.height - GROUND_HEIGHT - 50);
+					ctx.fillRect(x, y, 2, 2);
+				}
+
+				// Ground
+				ctx.fillStyle = COLORS.ground;
+				ctx.fillRect(0, canvas.height - GROUND_HEIGHT, canvas.width, GROUND_HEIGHT);
+
+				// Ground line
+				ctx.strokeStyle = COLORS.secondary;
+				ctx.lineWidth = 2;
+				ctx.beginPath();
+				ctx.moveTo(0, canvas.height - GROUND_HEIGHT);
+				ctx.lineTo(canvas.width, canvas.height - GROUND_HEIGHT);
+				ctx.stroke();
+
+				// Mountains in background
+				ctx.fillStyle = COLORS.dark;
+				ctx.beginPath();
+				for (let i = 0; i < 10; i++) {
+					const x = ((i * 400) - worldOffset * 0.3) % (canvas.width + 400) - 200;
+					const height = 50 + (i % 3) * 30;
+					ctx.moveTo(x, canvas.height - GROUND_HEIGHT);
+					ctx.lineTo(x + 100, canvas.height - GROUND_HEIGHT - height);
+					ctx.lineTo(x + 200, canvas.height - GROUND_HEIGHT);
+				}
+				ctx.fill();
+			}
+
+			// Main game loop
+			function gameLoop() {
+				if (gameState !== 'playing') {
+					requestAnimationFrame(gameLoop);
+					return;
+				}
+
+				// Clear canvas
+				ctx.fillStyle = COLORS.bg;
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+				// Draw background
+				drawBackground();
+
+				// Update and draw base
+				base.draw();
+				base.checkLanding();
+
+				// Update and draw buildings
+				for (const building of buildings) {
+					building.draw();
+				}
+
+				// Update and draw hostages
+				for (const hostage of hostages) {
+					hostage.update();
+					hostage.draw();
+				}
+
+				// Update and draw helicopter
+				helicopter.update();
+				helicopter.draw();
+
+				// Update and draw enemies
+				enemies = enemies.filter(enemy => {
+					const remove = enemy.update();
+					if (!remove) enemy.draw();
+					return !remove;
+				});
+
+				// Update and draw bullets
+				bullets = bullets.filter(bullet => {
+					const remove = bullet.update();
+					if (!remove) bullet.draw();
+					return !remove;
+				});
+
+				// Update and draw explosions
+				explosions = explosions.filter(explosion => {
+					const remove = explosion.update();
+					if (!remove) explosion.draw();
+					return !remove;
+				});
+
+				// Handle firing
+				if (isFiring && helicopter.direction !== 0) {
+					if (!helicopter._lastFire || Date.now() - helicopter._lastFire > 200) {
+						helicopter.fire();
+						helicopter._lastFire = Date.now();
+					}
+				}
+
+				// Check collisions
+				checkCollisions();
+
+				// Spawn enemies
+				spawnEnemies();
+
+				// Continue loop
+				requestAnimationFrame(gameLoop);
+			}
+
+			// Show game over screen
+			function showGameOver(won = false) {
+				const gameOverScreen = document.getElementById('game-over-screen');
+				const title = gameOverScreen.querySelector('h1');
+				title.textContent = won ? 'MISSION COMPLETE!' : 'GAME OVER';
+				document.getElementById('final-score').textContent = score;
+				document.getElementById('final-rescued').textContent = rescuedTotal;
+				gameOverScreen.classList.remove('hidden');
+			}
+
+			// Touch controls
+			function setupControls() {
+				const joystickZone = document.getElementById('joystick-zone');
+				const joystickStick = document.getElementById('joystick-stick');
+				const btnTurn = document.getElementById('btn-turn');
+				const btnFire = document.getElementById('btn-fire');
+
+				let joystickActive = false;
+				let joystickCenter = { x: 0, y: 0 };
+
+				function getJoystickCenter() {
+					const rect = joystickZone.getBoundingClientRect();
+					return {
+						x: rect.left + rect.width / 2,
+						y: rect.top + rect.height / 2
+					};
+				}
+
+				function updateJoystick(clientX, clientY) {
+					const center = joystickCenter;
+					const maxDist = 50;
+
+					let dx = clientX - center.x;
+					let dy = clientY - center.y;
+					const dist = Math.sqrt(dx * dx + dy * dy);
+
+					if (dist > maxDist) {
+						dx = (dx / dist) * maxDist;
+						dy = (dy / dist) * maxDist;
+					}
+
+					joystickStick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+
+					joystickX = dx / maxDist;
+					joystickY = dy / maxDist;
+				}
+
+				function resetJoystick() {
+					joystickStick.style.transform = 'translate(-50%, -50%)';
+					joystickX = 0;
+					joystickY = 0;
+				}
+
+				// Touch events for joystick
+				joystickZone.addEventListener('touchstart', (e) => {
+					e.preventDefault();
+					joystickActive = true;
+					joystickCenter = getJoystickCenter();
+					const touch = e.touches[0];
+					updateJoystick(touch.clientX, touch.clientY);
+				});
+
+				document.addEventListener('touchmove', (e) => {
+					if (!joystickActive) return;
+					e.preventDefault();
+					const touch = e.touches[0];
+					updateJoystick(touch.clientX, touch.clientY);
+				}, { passive: false });
+
+				document.addEventListener('touchend', (e) => {
+					// Check if joystick touch ended
+					let joystickTouchEnded = true;
+					for (const touch of e.touches) {
+						const rect = joystickZone.getBoundingClientRect();
+						if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+							touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+							joystickTouchEnded = false;
+							break;
+						}
+					}
+					if (joystickTouchEnded) {
+						joystickActive = false;
+						resetJoystick();
+					}
+				});
+
+				// Button events
+				btnTurn.addEventListener('touchstart', (e) => {
+					e.preventDefault();
+					if (!turnPressed && helicopter) {
+						helicopter.turn();
+						turnPressed = true;
+					}
+				});
+
+				btnTurn.addEventListener('touchend', (e) => {
+					e.preventDefault();
+					turnPressed = false;
+				});
+
+				btnFire.addEventListener('touchstart', (e) => {
+					e.preventDefault();
+					isFiring = true;
+				});
+
+				btnFire.addEventListener('touchend', (e) => {
+					e.preventDefault();
+					isFiring = false;
+				});
+
+				// Keyboard controls (for desktop testing)
+				document.addEventListener('keydown', (e) => {
+					switch(e.key) {
+						case 'ArrowLeft': joystickX = -1; break;
+						case 'ArrowRight': joystickX = 1; break;
+						case 'ArrowUp': joystickY = -1; break;
+						case 'ArrowDown': joystickY = 1; break;
+						case ' ': isFiring = true; break;
+						case 'z':
+						case 'Z':
+							if (!turnPressed && helicopter) {
+								helicopter.turn();
+								turnPressed = true;
+							}
+							break;
+					}
+				});
+
+				document.addEventListener('keyup', (e) => {
+					switch(e.key) {
+						case 'ArrowLeft':
+						case 'ArrowRight':
+							joystickX = 0;
+							break;
+						case 'ArrowUp':
+						case 'ArrowDown':
+							joystickY = 0;
+							break;
+						case ' ':
+							isFiring = false;
+							break;
+						case 'z':
+						case 'Z':
+							turnPressed = false;
+							break;
+					}
+				});
+
+				// Start/restart buttons
+				document.getElementById('start-btn').addEventListener('click', () => {
+					document.getElementById('start-screen').classList.add('hidden');
+					initGame();
+					gameState = 'playing';
+				});
+
+				document.getElementById('restart-btn').addEventListener('click', () => {
+					document.getElementById('game-over-screen').classList.add('hidden');
+					initGame();
+					gameState = 'playing';
+				});
+			}
+
+			// Initialize
+			window.addEventListener('load', () => {
+				resizeCanvas();
+				setupControls();
+				gameLoop();
+			});
+
+			window.addEventListener('resize', resizeCanvas);
+		</script>
+	</body>
+</html>
